@@ -84,7 +84,6 @@ namespace weixinDemo
             try
             {
                 t.Abort();
-                t.DisableComObjectEagerCleanup();
             }
             catch
             {

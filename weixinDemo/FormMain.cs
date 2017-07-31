@@ -161,7 +161,6 @@ namespace weixinDemo
             {
                 FormLogin.instance.Close();
                 FormLogin.instance.t.Abort();
-                FormLogin.instance.t.DisableComObjectEagerCleanup();
             }
             catch
             {
