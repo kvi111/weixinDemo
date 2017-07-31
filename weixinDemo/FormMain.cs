@@ -144,15 +144,29 @@ namespace weixinDemo
 
         private void textBoxInput_KeyUp(object sender, KeyEventArgs e)
         {
+
+        }
+
+        private void textBoxInput_KeyDown(object sender, KeyEventArgs e)
+        {
             if (e.KeyCode == Keys.Enter)
             {
                 btnSend.PerformClick();
             }
         }
 
-        private void timer1_Tick(object sender, EventArgs e)
+        private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            try
+            {
+                FormLogin.instance.Close();
+                FormLogin.instance.t.Abort();
+                FormLogin.instance.t.DisableComObjectEagerCleanup();
+            }
+            catch
+            {
 
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ namespace weixinDemo
         public static FormLogin instance;
         public static FormMain formMain;
         public StartUI startUI;
+        public Thread t;
 
         public FormLogin()
         {
@@ -22,7 +23,7 @@ namespace weixinDemo
             formMain = new FormMain();
             startUI = new StartUI();
 
-            Thread t = new Thread(new ThreadStart(StartWeixin));
+            t = new Thread(new ThreadStart(StartWeixin));
             //t.IsBackground = true;
             t.Start();
         }
@@ -70,6 +71,24 @@ namespace weixinDemo
             else
             {
                 this.Visible = isVisable;
+            }
+        }
+
+        private void FormLogin_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            FormClose();
+        }
+
+        public void FormClose()
+        {
+            try
+            {
+                t.Abort();
+                t.DisableComObjectEagerCleanup();
+            }
+            catch
+            {
+
             }
         }
     }
