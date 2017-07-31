@@ -8,7 +8,6 @@ namespace weixinDemo
 {
     public partial class FormMain : Form
     {
-        public JArray contactList;
         public FormMain()
         {
             InitializeComponent();
@@ -26,7 +25,7 @@ namespace weixinDemo
 
         public void SetContact(JArray contactList)
         {
-            Console.WriteLine("SetContact开始......");
+            //WriteLog("SetContact开始......");
             foreach (JObject contact in contactList)
             {
                 ListItem listItem = new ListItem() { text = ((JValue)contact["NickName"]).Value.ToString(), value = ((JValue)contact["UserName"]).Value.ToString() };
@@ -53,12 +52,18 @@ namespace weixinDemo
             msg += "\n";
             if (textBoxHistory.InvokeRequired)
             {
-                Action<string> actionDelegate = delegate (string item) { textBoxHistory.AppendText(item); };
+                Action<string> actionDelegate = delegate (string item) {
+                    textBoxHistory.AppendText(item);
+                    textBoxHistory.SelectionStart = textBoxHistory.Text.Length;
+                    textBoxHistory.ScrollToCaret();
+                };
                 textBoxHistory.Invoke(actionDelegate, msg);
             }
             else
             {
                 textBoxHistory.AppendText(msg);
+                textBoxHistory.SelectionStart = textBoxHistory.Text.Length;
+                textBoxHistory.ScrollToCaret();
             }
         }
         public void SetTitle(string msg)
@@ -126,10 +131,28 @@ namespace weixinDemo
                 MessageBox.Show("不能发送空白信息！");
                 return;
             }
+            if (lblNickName.Tag == null)
+            {
+                MessageBox.Show("请先选定一个联系人！");
+                return;
+            }
             FormLogin.instance.startUI.sendText(textBoxInput.Text, ((ListItem)lblNickName.Tag).value);
             textBoxHistory.AppendText(DateTime.Now.ToString(" hh:mm:ss ")+"我：" + textBoxInput.Text + "\r\n");
             //chatListBox1.Items.Add(new CCWin.SkinControl.ChatListItem() {  Text = textBoxInput.Text });
             textBoxInput.Text = "";
+        }
+
+        private void textBoxInput_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                btnSend.PerformClick();
+            }
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+
         }
     }
 }

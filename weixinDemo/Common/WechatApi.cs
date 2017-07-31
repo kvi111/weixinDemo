@@ -1,14 +1,10 @@
-﻿using Json;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace weixinDemo
@@ -212,63 +208,94 @@ namespace weixinDemo
         /// 获取uuid
         /// </summary>
         /// <returns></returns>
-        public bool getUUID()
+        public void getUUID()
         {
-            Console.WriteLine(Const.LOG_MSG_GET_UUID);
-
-            String url = conf["API_jsLogin"];
-            Dictionary<String, Object> params1 = new Dictionary<String, Object>();
-            params1.Add("appid", appid);
-            params1.Add("fun", "new");
-            params1.Add("lang", conf["LANG"]);
-            params1.Add("_", Utils.currentTimeMillis() + "");
-
-            String response = doGet(url, new Dictionary<String, Object>[] { params1 });
-            if (string.IsNullOrEmpty(response))
+            while (true)
             {
-                Console.WriteLine("获取UUID失败");
-                return false;
-            }
+                try
+                {
+                    WriteLog(Const.LOG_MSG_GET_UUID);
 
-            String code = Utils.match(response, "window.QRLogin.code = (\\d+);");
+                    String url = conf["API_jsLogin"];
+                    Dictionary<String, Object> params1 = new Dictionary<String, Object>();
+                    params1.Add("appid", appid);
+                    params1.Add("fun", "new");
+                    params1.Add("lang", conf["LANG"]);
+                    params1.Add("_", Utils.currentTimeMillis() + "");
 
-            if (string.IsNullOrEmpty(code))
-            {
-                Console.WriteLine("获取UUID失败");
-                return false;
-            }
+                    String response = doGet(url, new Dictionary<String, Object>[] { params1 });
+                    if (string.IsNullOrEmpty(response))
+                    {
+                        WriteLog("获取UUID失败");
+                        continue;
+                        //return false;
+                    }
 
-            if (code != "200")
-            {
-                Console.WriteLine("错误的状态码: {0}", code);
-                return false;
+                    String code = Utils.match(response, "window.QRLogin.code = (\\d+);");
+
+                    if (string.IsNullOrEmpty(code))
+                    {
+                        WriteLog("获取UUID失败");
+                        continue;
+                        //return false;
+                    }
+
+                    if (code != "200")
+                    {
+                        WriteLog("错误的状态码: {0}", code);
+                        continue;
+                        //return false;
+                    }
+                    session = new Session();
+                    session.setUuid(Utils.match(response, "window.QRLogin.uuid = \"(.*)\";"));
+                    //return true;
+                    WriteLog(Const.LOG_MSG_SUCCESS);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    WriteLog("getUUID异常：{0}", ex.Message);
+                }
             }
-            session = new Session();
-            session.setUuid(Utils.match(response, "window.QRLogin.uuid = \"(.*)\";"));
-            return true;
         }
 
         /// <summary>
         /// 获取二维码
         /// </summary>
         /// <returns></returns>
-        public byte[] genqrcode()
+        public void genqrcode()
         {
-            try
+            while (true)
             {
-                Console.WriteLine(Const.LOG_MSG_GET_QRCODE);
+                try
+                {
+                    WriteLog(Const.LOG_MSG_GET_QRCODE);
 
-                String url = conf["API_qrcode_img"] + session.getUuid();
-                string formBody = "t=webwx&_=" + Utils.currentTimeMillis();
+                    String url = conf["API_qrcode_img"] + session.getUuid();
+                    string formBody = "t=webwx&_=" + Utils.currentTimeMillis();
 
-                byte[] postData = Encoding.UTF8.GetBytes(formBody);
-                return Utils.PostWebRequestBytes(url, formBody);
+                    //byte[] postData = Encoding.UTF8.GetBytes(formBody);
+
+                    byte[] byteData = Utils.PostWebRequestBytes(url, formBody);
+
+                    if (byteData.Length > 1000)
+                    {
+                        FormLogin.instance.SetQRImage(byteData);
+                        WriteLog(Const.LOG_MSG_SUCCESS);
+                        break;
+                    }
+                    else
+                    {
+                        WriteLog(Const.LOG_MSG_FAIL);
+                        continue;
+                    }
+                }
+                catch (Exception e)
+                {
+                    WriteLog("[*] 生成二维码异常：{0}", e.Message);
+                    continue;
+                }
             }
-            catch (Exception e)
-            {
-                Console.WriteLine("[*] 生成二维码失败：{0}", e);
-            }
-            return new byte[] { };
         }
 
         /// <summary>
@@ -286,14 +313,14 @@ namespace weixinDemo
 
             if (Utils.isBlank(response))
             {
-                Console.WriteLine("扫描二维码验证失败");
+                WriteLog("扫描二维码验证失败");
                 return false;
             }
 
             String code = Utils.match(response, "window.code=(\\d+);");
             if (Utils.isBlank(code))
             {
-                Console.WriteLine("扫描二维码验证失败");
+                WriteLog("扫描二维码验证失败");
                 return false;
             }
 
@@ -313,64 +340,72 @@ namespace weixinDemo
             }
             if (code == "408")
             {
-                Console.WriteLine(Const.LOG_MSG_WAIT_LOGIN_ERR1);
+                WriteLog(Const.LOG_MSG_WAIT_LOGIN_ERR1);
             }
             else
             {
-                Console.WriteLine(Const.LOG_MSG_WAIT_LOGIN_ERR2);
+                WriteLog(Const.LOG_MSG_WAIT_LOGIN_ERR2);
             }
             return false;
         }
-        
+
         /// <summary>
         /// 登录微信
         /// </summary>
         /// <returns></returns>
-        public bool login()
+        public void login()
         {
-            Console.WriteLine(Const.LOG_MSG_LOGIN);
-            Console.WriteLine("[*] 登录请求 =>\n");
-            try
+            while (true)
             {
-                HttpWebRequest webClient = (HttpWebRequest)HttpWebRequest.Create(this.redirectUri);
-
-                if (null != cookie)
+                try
                 {
-                    webClient.Headers.Add("Cookie", this.cookie);
-                    //requestBuilder.addHeader("Cookie", this.cookie);
-                }
+                    WriteLog(Const.LOG_MSG_LOGIN);
 
-                String body = "";
-                HttpWebResponse webR = (HttpWebResponse)webClient.GetResponse();
+                    HttpWebRequest webClient = (HttpWebRequest)HttpWebRequest.Create(this.redirectUri);
 
-                List<String> cookies = webR.Headers.GetValues("Set-Cookie").ToList();// headers.values("Set-Cookie");
-                this.cookie = Utils.getCookie(cookies);  //webR.Headers["Set-Cookie"].ToString();//
+                    if (null != cookie)
+                    {
+                        webClient.Headers.Add("Cookie", this.cookie);
+                        //requestBuilder.addHeader("Cookie", this.cookie);
+                    }
 
-                Console.WriteLine("[*] 设置cookie [{0}]", this.cookie);
+                    String body = "";
+                    HttpWebResponse webR = (HttpWebResponse)webClient.GetResponse();
 
-                using (StreamReader sr = new StreamReader(webR.GetResponseStream()))
-                {
-                    body = sr.ReadToEnd();
-                }
+                    List<String> cookies = webR.Headers.GetValues("Set-Cookie").ToList();// headers.values("Set-Cookie");
+                    this.cookie = Utils.getCookie(cookies);  //webR.Headers["Set-Cookie"].ToString();//
 
-                if (Utils.isBlank(body))
-                {
-                    return false;
-                }
-                session.setSkey(Utils.match(body, "<skey>(\\S+)</skey>"));
-                session.setSid(Utils.match(body, "<wxsid>(\\S+)</wxsid>"));
-                session.setUin(Utils.match(body, "<wxuin>(\\S+)</wxuin>"));
-                session.setPassTicket(Utils.match(body, "<pass_ticket>(\\S+)</pass_ticket>"));
+                    WriteLog("[*] 设置cookie [{0}]", this.cookie);
 
-                this.baseRequest = Utils.createMap(new object[]{"Uin", long.Parse(session.getUin()),
+                    using (StreamReader sr = new StreamReader(webR.GetResponseStream()))
+                    {
+                        body = sr.ReadToEnd();
+                    }
+
+                    if (Utils.isBlank(body))
+                    {
+                        WriteLog(Const.LOG_MSG_FAIL);
+                        continue;
+                        //return false;
+                    }
+                    session.setSkey(Utils.match(body, "<skey>(\\S+)</skey>"));
+                    session.setSid(Utils.match(body, "<wxsid>(\\S+)</wxsid>"));
+                    session.setUin(Utils.match(body, "<wxuin>(\\S+)</wxuin>"));
+                    session.setPassTicket(Utils.match(body, "<pass_ticket>(\\S+)</pass_ticket>"));
+
+                    this.baseRequest = Utils.createMap(new object[]{"Uin", long.Parse(session.getUin()),
                         "Sid", session.getSid(), "Skey", session.getSkey(), "DeviceID", this.deviceId });
 
-                return true;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("[*] 登录失败", e);
-                return false;
+                    WriteLog(Const.LOG_MSG_SUCCESS);
+                    break;
+                    //return true;
+                }
+                catch (Exception e)
+                {
+                    WriteLog("[*] login 异常：{0}", e.Message);
+                    continue;
+                    //return false;
+                }
             }
         }
 
@@ -415,12 +450,12 @@ namespace weixinDemo
                     body = sr.ReadToEnd();
                 }
 
-                //Console.WriteLine("[*] 响应 => {0}", body);
+                //WriteLog("[*] 响应 => {0}", body);
                 return body;
             }
             catch (Exception e)
             {
-                Console.WriteLine("doGet异常：{0}", e.StackTrace);
+                WriteLog("doGet异常：{0}", e.StackTrace);
                 return null;
             }
         }
@@ -447,7 +482,7 @@ namespace weixinDemo
                 requestStream.Close();
             }
 
-            //Console.WriteLine("[*] 请求 => \n");
+            //WriteLog("[*] 请求 => \n");
             try
             {
                 //Response response = client.newCall(request).execute();
@@ -458,14 +493,14 @@ namespace weixinDemo
                 }
                 if (null != body && body.Length <= 300)
                 {
-                    Console.WriteLine("[*] 响应 => {0}", body);
+                    WriteLog("[*] 响应 => {0}", body);
                 }
 
                 return JObject.Parse(body);  //JsonObject
             }
             catch (Exception e)
             {
-                Console.WriteLine("doPost异常：{0}", e.StackTrace);
+                WriteLog("doPost异常：{0}", e.StackTrace);
                 return null; // JObject.Parse("{}");
             }
         }
@@ -473,30 +508,40 @@ namespace weixinDemo
         /// 微信初始化
         /// </summary>
         /// <returns></returns>
-        public Boolean webwxinit()
+        public void webwxinit()
         {
-            Console.WriteLine(Const.LOG_MSG_INIT);
-            if (null == session)
+            while (true)
             {
-                return false;
+                try
+                {
+                    WriteLog(Const.LOG_MSG_INIT);
+
+                    String url = conf["API_webwxinit"] + "?pass_ticket={0}&r={1}";  //&skey={1}
+                    url = String.Format(url, session.getPassTicket(), Utils.currentTimeMillis()); //session.getSkey(),
+
+                    Dictionary<String, Object> param = Utils.createMap(new Object[] { "BaseRequest", this.baseRequest });
+
+                    JObject responseJson = doPost(url, param);
+                    if (null == responseJson)
+                    {
+                        continue;
+                    }
+
+                    this.user = JsonToDictionary(responseJson["User"]);
+                    this.makeSynckey(responseJson);
+
+                    if (((JValue)responseJson["BaseResponse"]["Ret"]).Value.ToString() == "0")
+                    {
+                        WriteLog(Const.LOG_MSG_SUCCESS);
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLog("webwxinit异常：{0}", ex.Message);
+                    continue;
+                }
             }
-
-            String url = conf["API_webwxinit"] + "?pass_ticket={0}&r={1}";  //&skey={1}
-            url = String.Format(url, session.getPassTicket(), Utils.currentTimeMillis()); //session.getSkey(),
-
-            Dictionary<String, Object> param = Utils.createMap(new Object[] { "BaseRequest", this.baseRequest });
-
-            JObject responseJson = doPost(url, param);
-            if (null == responseJson)
-            {
-                return false;
-            }
-
-            this.user = JsonToDictionary(responseJson["User"]);
-
-            this.makeSynckey(responseJson);
-
-            return ((JValue)responseJson["BaseResponse"]["Ret"]).Value.ToString() == "0";
         }
         /// <summary>
         /// 得到Synckey
@@ -518,25 +563,42 @@ namespace weixinDemo
         /// 开启微信状态通知
         /// </summary>
         /// <returns></returns>
-        public Boolean openStatusNotify()
+        public void openStatusNotify()
         {
-            Console.WriteLine(Const.LOG_MSG_STATUS_NOTIFY);
-            String url = conf["API_webwxstatusnotify"] + "?lang={0}&pass_ticket={1}";
-            url = String.Format(url, conf["LANG"], session.getPassTicket());
-
-            Dictionary<String, Object> params1 = new Dictionary<String, Object>();
-            params1.Add("BaseRequest", this.baseRequest);
-            params1.Add("Code", 3);
-            params1.Add("FromUserName", this.user["UserName"]);
-            params1.Add("ToUserName", this.user["UserName"]);
-            params1.Add("ClientMsgId", Utils.currentTimeMillis());
-
-            JObject response = doPost(url, params1);
-            if (null == response)
+            while (true)
             {
-                return false;
+                try
+                {
+                    WriteLog(Const.LOG_MSG_STATUS_NOTIFY);
+
+                    String url = conf["API_webwxstatusnotify"] + "?lang={0}&pass_ticket={1}";
+                    url = String.Format(url, conf["LANG"], session.getPassTicket());
+
+                    Dictionary<String, Object> params1 = new Dictionary<String, Object>();
+                    params1.Add("BaseRequest", this.baseRequest);
+                    params1.Add("Code", 3);
+                    params1.Add("FromUserName", this.user["UserName"]);
+                    params1.Add("ToUserName", this.user["UserName"]);
+                    params1.Add("ClientMsgId", Utils.currentTimeMillis());
+
+                    JObject response = doPost(url, params1);
+                    if (null == response)
+                    {
+                        continue;
+                        //return false;
+                    }
+                    if (((JValue)response["BaseResponse"]["Ret"]).Value.ToString() == "0")
+                    {
+                        WriteLog(Const.LOG_MSG_SUCCESS);
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLog("webwxinit异常：{0}", ex.Message);
+                    continue;
+                }
             }
-            return ((JValue)response["BaseResponse"]["Ret"]).Value.ToString() == "0";
         }
         /// <summary>
         /// 获取联系人
@@ -572,66 +634,78 @@ namespace weixinDemo
         ///"EncryChatRoomId": ""
         /// </summary>
         /// <returns></returns>
-        public Boolean getContact()
+        public void getContact()
         {
-            Console.WriteLine(Const.LOG_MSG_GET_CONTACT);
-            String url = conf["API_webwxgetcontact"] + "?pass_ticket={0}&skey={1}&r={2}";
-            url = String.Format(url, session.getPassTicket(), session.getSkey(), Utils.currentTimeMillis());
-
-            HashSet<String> specialUsers = Const.API_SPECIAL_USER;
-
-            JObject response = doPost(url, null);
-            if (null == response)
+            while (true)
             {
-                return false;
+                try
+                {
+                    WriteLog(Const.LOG_MSG_GET_CONTACT);
+                    String url = conf["API_webwxgetcontact"] + "?pass_ticket={0}&skey={1}&r={2}";
+                    url = String.Format(url, session.getPassTicket(), session.getSkey(), Utils.currentTimeMillis());
+
+                    HashSet<String> specialUsers = Const.API_SPECIAL_USER;
+
+                    JObject response = doPost(url, null);
+                    if (null == response)
+                    {
+                        continue;
+                    }
+
+                    this.memberCount = int.Parse(((JValue)response["MemberCount"]).Value.ToString());
+                    this.memberList = (JArray)response["MemberList"];
+
+                    JArray ContactList = new JArray(memberList);
+
+                    this.publicUsersList = new JArray();
+                    this.groupList = new JArray();
+                    this.specialUsersList = new JArray();
+
+                    foreach (JObject contact in memberList)
+                    {
+                        string elementVerifyFlag = ((JValue)contact["VerifyFlag"]).Value.ToString();
+                        string elementUserName = ((JValue)contact["UserName"]).Value.ToString();
+                        if (elementVerifyFlag != "0") //公众号/服务号
+                        {
+                            ContactList.Remove(contact);
+                            this.publicUsersList.Add(contact);
+                        }
+                        else if (specialUsers.Contains(elementUserName)) //特殊账号
+                        {
+                            ContactList.Remove(contact);
+                            this.specialUsersList.Add(contact);
+                        }
+                        else if (elementUserName.Contains("@@")) // 微信群
+                        {
+                            ContactList.Remove(contact);
+                            this.groupList.Add(contact);
+                        }
+                        else if (elementUserName == this.user["UserName"].ToString()) //自己
+                        {
+                            ContactList.Remove(contact);
+                        }
+                    }
+                    this.contactList = ContactList;
+
+                    WriteLog(Const.LOG_MSG_CONTACT_COUNT, memberCount, memberList.Count);
+                    WriteLog(Const.LOG_MSG_OTHER_CONTACT_COUNT, groupList.Count, contactList.Count, specialUsersList.Count, publicUsersList.Count);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    WriteLog("getContact异常：{0}", ex.Message);
+                    continue;
+                }
             }
-
-            this.memberCount = int.Parse(((JValue)response["MemberCount"]).Value.ToString());
-            this.memberList = (JArray)response["MemberList"];
-
-            JArray ContactList = new JArray(memberList);
-
-            this.publicUsersList = new JArray();
-            this.groupList = new JArray();
-            this.specialUsersList = new JArray();
-
-            foreach (JObject contact in memberList)
-            {
-                string elementVerifyFlag = ((JValue)contact["VerifyFlag"]).Value.ToString();
-                string elementUserName = ((JValue)contact["UserName"]).Value.ToString();
-                if (elementVerifyFlag != "0") //公众号/服务号
-                {
-                    ContactList.Remove(contact);
-                    this.publicUsersList.Add(contact);
-                }
-                else if (specialUsers.Contains(elementUserName)) //特殊账号
-                {
-                    ContactList.Remove(contact);
-                    this.specialUsersList.Add(contact);
-                }
-                else if (elementUserName.Contains("@@")) // 微信群
-                {
-                    ContactList.Remove(contact);
-                    this.groupList.Add(contact);
-                }
-                else if (elementUserName == this.user["UserName"].ToString()) //自己
-                {
-                    ContactList.Remove(contact);
-                }
-            }
-            this.contactList = ContactList;
-
-            Console.WriteLine(Const.LOG_MSG_CONTACT_COUNT, memberCount, memberList.Count);
-            Console.WriteLine(Const.LOG_MSG_OTHER_CONTACT_COUNT, groupList.Count, contactList.Count, specialUsersList.Count, publicUsersList.Count);
-            return true;
         }
+
         /// <summary>
         /// 保存配置
         /// </summary>
         /// <returns></returns>
         public Boolean snapshot()
         {
-            Console.WriteLine(Const.LOG_MSG_SNAPSHOT);
+            WriteLog(Const.LOG_MSG_SNAPSHOT);
             return false;
         }
 
@@ -808,7 +882,7 @@ namespace weixinDemo
                     {
                         user["RemarkName"] = Utils.emptyOr(((JValue)element["RemarkName"]).Value.ToString(), "");
                         user["NickName"] = Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
-                        if (string.IsNullOrEmpty(user["RemarkName"])==false)
+                        if (string.IsNullOrEmpty(user["RemarkName"]) == false)
                         {
                             user["ShowName"] = user["RemarkName"];
                         }
@@ -842,6 +916,12 @@ namespace weixinDemo
                 dict.Add(j.Name, j.Value);
             }
             return dict;
+        }
+
+        public void WriteLog(string formatString, params object[] parms)
+        {
+            string msg = String.Format(formatString, parms);
+            Console.WriteLine(DateTime.Now.ToString(" hh:mm:ss ") + msg);
         }
     }
 }

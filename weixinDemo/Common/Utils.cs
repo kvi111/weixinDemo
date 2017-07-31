@@ -116,9 +116,9 @@ namespace weixinDemo
                 return JsonConvert.SerializeObject(o);
                 //return gson.toJson(o);
             }
-            catch (Exception e)
+            catch
             {
-                Console.WriteLine("Json序列化失败", e);
+                //WriteLog("Json序列化失败", e);
             }
             return "";
         }
@@ -134,7 +134,7 @@ namespace weixinDemo
         //        }
         //        catch (Exception e)
         //        {
-        //            Console.WriteLine("Json反序列化失败", e);
+        //            WriteLog("Json反序列化失败", e);
         //        }
         //        return null;
         //    }
@@ -190,7 +190,7 @@ namespace weixinDemo
                 byte[] utf8Bytes = Encoding.Convert(unicode, utf8, unicodeBytes);
                 return utf8.GetString(utf8Bytes);
             }
-            catch (Exception e)
+            catch
             {
 
             }
@@ -225,9 +225,9 @@ namespace weixinDemo
                 byte[] responseData = PostWebRequestBytes(postUrl, paramData);
                 ret = Encoding.UTF8.GetString(responseData);//解码
             }
-            catch (Exception ex)
+            catch
             {
-                //MessageBox.Show(ex.Message);
+             
             }
             return ret;
         }
@@ -240,9 +240,9 @@ namespace weixinDemo
                 WebClient webClient = new WebClient();
                 responseData = webClient.UploadData(postUrl, "POST", postData);//得到返回字符流
             }
-            catch (Exception ex)
+            catch
             {
-                //MessageBox.Show(ex.Message);
+            
             }
             return responseData;
         }

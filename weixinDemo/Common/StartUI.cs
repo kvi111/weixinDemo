@@ -30,7 +30,7 @@ namespace weixinDemo
         {
             while (true)
             {
-                Console.WriteLine(Const.LOG_MSG_SCAN_QRCODE);
+                WriteLog(Const.LOG_MSG_SCAN_QRCODE);
                 if (!waitforlogin(1))
                 {
                     continue;
@@ -39,7 +39,7 @@ namespace weixinDemo
             }
             while (true)
             {
-                Console.WriteLine(Const.LOG_MSG_CONFIRM_LOGIN);
+                WriteLog(Const.LOG_MSG_CONFIRM_LOGIN);
                 if (!waitforlogin(0))
                 {
                     continue;
@@ -53,65 +53,23 @@ namespace weixinDemo
          */
         public void start()
         {
-            Console.WriteLine(Const.LOG_MSG_START);
-            Console.WriteLine(Const.LOG_MSG_TRY_INIT);
+            WriteLog(Const.LOG_MSG_START);
 
-            if (getUUID()==false) //获取uuid
-            {
-                Console.WriteLine(Const.LOG_MSG_FAIL);
-                return;
-            }
+            getUUID(); //获取uuid
             
-            Byte[] byteData = genqrcode();//获取二维码
-            if (byteData.Length > 1000)
-            {
-                FormLogin.instance.SetQRImage(byteData);
-            }
-            else
-            {
-                Console.WriteLine(Const.LOG_MSG_FAIL);
-                return;
-            }
+            genqrcode();//获取二维码
 
             waitForLogin();//等待用户扫描、确定
-            
-            if (login()==false) //登录
-            {
-                Console.WriteLine(Const.LOG_MSG_FAIL);
-                return;
-            }
-            
-            if (webwxinit()==false) //初始化
-            {
-                Console.WriteLine(Const.LOG_MSG_FAIL);
-                return;
-            }
 
-            if (openStatusNotify()==false) //开启微信状态通知
-            {
-                Console.WriteLine(Const.LOG_MSG_FAIL);
-                return;
-            }
+            login(); //登录
             
-            if (getContact()==false) //获取联系人
-            {
-                Console.WriteLine(Const.LOG_MSG_FAIL);
-                return;
-            }
+            webwxinit(); //初始化
+
+            openStatusNotify(); //开启微信状态通知
+
+            getContact(); //获取联系人
 
             //填充联系人列表
-            //if (groupList.size() > 0)
-            //{
-            //    executorService.execute(new Runnable() {
-            //        @Override
-            //        public void run()
-            //    {
-            //        Console.WriteLine(Const.LOG_MSG_GET_GROUP_MEMBER);
-            //        StartUI.super.fetchGroupContacts();
-            //    }
-            //});
-            //}
-
             FormLogin.instance.SetVisable(false);
             FormLogin.instance.ShowMain();
             FormLogin.formMain.SetContact(this.contactList);
@@ -131,35 +89,36 @@ namespace weixinDemo
             {
                 try
                 {
-                    Console.WriteLine("listen synccheck ...");
+                    WriteLog("listen synccheck ...");
                     //retcode, selector
                     int[] checkResponse = synccheck();
                     int retcode = checkResponse[0];
                     int selector = checkResponse[1];
-                    Console.WriteLine("retcode: {0}, selector: {1}", retcode, selector);
+                    WriteLog("retcode: {0}, selector: {1}", retcode, selector);
                     switch (retcode)
                     {
                         case 1100:
-                            Console.WriteLine(Const.LOG_MSG_LOGOUT);
+                            WriteLog(Const.LOG_MSG_LOGOUT);
                             break;
                         case 1101:
-                            Console.WriteLine(Const.LOG_MSG_LOGIN_OTHERWHERE);
+                            WriteLog(Const.LOG_MSG_LOGIN_OTHERWHERE);
                             break;
                         case 1102:
-                            Console.WriteLine(Const.LOG_MSG_QUIT_ON_PHONE);
+                            WriteLog(Const.LOG_MSG_QUIT_ON_PHONE);
                             break;
                         case 0:
                             this.handle(selector);
                             break;
                         default:
-                            Console.WriteLine("wxSync: {0}\n", wxSync().ToString());
+                            WriteLog("wxSync: {0}\n", wxSync().ToString());
                             break;
                     }
-                    Thread.Sleep(1000);
+                    WriteLog("listen synccheck ...end.");
+                    Thread.Sleep(3000);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("listen synccheck 异常：{0}",ex.StackTrace);
+                    WriteLog("listen异常：{0}", ex.Message);
                 }
             }
         }
@@ -239,7 +198,7 @@ namespace weixinDemo
         /// <param name="dic"></param>
         public void handle_msg(JObject dic)
         {
-            Console.WriteLine("handle message");
+            WriteLog("handle message");
             if (null != messageHandle)
             {
                 messageHandle.WxSync(dic);
@@ -251,7 +210,7 @@ namespace weixinDemo
                 return;
             }
 
-            Console.WriteLine(Const.LOG_MSG_NEW_MSG, intMegCount);
+            WriteLog(Const.LOG_MSG_NEW_MSG, intMegCount);
 
             JArray msgs = (JArray)dic["AddMsgList"];
             foreach (JObject element in msgs)
@@ -291,7 +250,7 @@ namespace weixinDemo
                 }
                 else if (conf["MSGTYPE_STATUSNOTIFY"]==msgType)
                 {
-                    Console.WriteLine(Const.LOG_MSG_NOTIFY_PHONE);
+                    WriteLog(Const.LOG_MSG_NOTIFY_PHONE);
                     return;
                 }
 
@@ -355,7 +314,7 @@ namespace weixinDemo
 
             if (null != group)
             {
-                Console.WriteLine("{0} |{1}| {2} -> {3}: {4}\n", msg_id, group["ShowName"], src["ShowName"],
+                WriteLog("{0} |{1}| {2} -> {3}: {4}\n", msg_id, group["ShowName"], src["ShowName"],
                         dst["ShowName"], userMessage.getLog());
             }
             else
@@ -363,7 +322,7 @@ namespace weixinDemo
                 string newMsg = string.Format(DateTime.Now.ToString(" hh:mm:ss ") + "{0} {1} -> {2}: {3}\n", msg_id, src["ShowName"],
                         dst["ShowName"], userMessage.getLog());
                 
-                Console.WriteLine(newMsg);
+                WriteLog(newMsg);
             }
             //显示到界面上
             string showMsg = DateTime.Now.ToString(" hh:mm:ss ") + src["ShowName"] + "：" + userMessage.getLog() + "\r\n";
@@ -380,7 +339,7 @@ namespace weixinDemo
 
         private void handle_mod(JObject dic)
         {
-            Console.WriteLine("handle modify");
+            WriteLog("handle modify");
             handle_msg(dic);
 
             JArray modContactList = (JArray)dic["ModContactList"];
@@ -443,7 +402,7 @@ namespace weixinDemo
 
         private GroupMessage make_group_msg(UserMessage userMessage)
         {
-            Console.WriteLine("make group message");
+            WriteLog("make group message");
             GroupMessage groupMessage = new GroupMessage(this);
             groupMessage.setRawMsg(userMessage.getRawMsg());
             groupMessage.setMsgId(((JValue)userMessage.getRawMsg()["MsgId"]).Value.ToString());

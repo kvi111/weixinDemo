@@ -24,7 +24,7 @@ namespace weixinDemo
         public static String LOG_MSG_TRY_INIT = "[*] 尝试初始化 ... ";
         public static String LOG_MSG_ASSOCIATION_LOGIN = "[*] 通过关联登录 ... ";
         public static String LOG_MSG_GET_UUID = "[*] 正在获取 uuid ... ";
-        public static String LOG_MSG_GET_QRCODE = "[*] 正在获取二维码 ... 成功\n";
+        public static String LOG_MSG_GET_QRCODE = "[*] 正在获取二维码 ... ";
         public static String LOG_MSG_SCAN_QRCODE = "[*] 请使用微信扫描二维码以登录 ... \n";
         public static String LOG_MSG_CONFIRM_LOGIN = "[*] 请在手机上点击确认以登录 ... \n";
         public static String LOG_MSG_WAIT_LOGIN_ERR1 = "[登录超时] \n";

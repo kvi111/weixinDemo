@@ -28,11 +28,13 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.listBoxContact = new System.Windows.Forms.ListBox();
             this.textBoxHistory = new System.Windows.Forms.TextBox();
             this.textBoxInput = new System.Windows.Forms.TextBox();
             this.btnSend = new System.Windows.Forms.Button();
             this.lblNickName = new System.Windows.Forms.Label();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.SuspendLayout();
             // 
             // listBoxContact
@@ -41,6 +43,7 @@
             | System.Windows.Forms.AnchorStyles.Left)));
             this.listBoxContact.BackColor = System.Drawing.SystemColors.InactiveBorder;
             this.listBoxContact.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.listBoxContact.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
             this.listBoxContact.FormattingEnabled = true;
             this.listBoxContact.ItemHeight = 12;
             this.listBoxContact.Location = new System.Drawing.Point(2, 1);
@@ -79,6 +82,7 @@
             this.textBoxInput.Name = "textBoxInput";
             this.textBoxInput.Size = new System.Drawing.Size(759, 273);
             this.textBoxInput.TabIndex = 2;
+            this.textBoxInput.KeyUp += new System.Windows.Forms.KeyEventHandler(this.textBoxInput_KeyUp);
             // 
             // btnSend
             // 
@@ -102,6 +106,11 @@
             this.lblNickName.Size = new System.Drawing.Size(21, 20);
             this.lblNickName.TabIndex = 4;
             this.lblNickName.Text = "   ";
+            // 
+            // timer1
+            // 
+            this.timer1.Interval = 2000;
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
             // 
             // FormMain
             // 
@@ -128,5 +137,6 @@
         private System.Windows.Forms.TextBox textBoxInput;
         private System.Windows.Forms.Button btnSend;
         private System.Windows.Forms.Label lblNickName;
+        private System.Windows.Forms.Timer timer1;
     }
 }

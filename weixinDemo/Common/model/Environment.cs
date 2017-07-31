@@ -100,7 +100,7 @@ namespace weixinDemo
         //        try {
         //            return new Environment().of(new URL(location));
         //        } catch (MalformedURLException e) {
-        //            Console.WriteLine("", e);
+        //            WriteLog("", e);
         //            return null;
         //        }
         //    } else {
@@ -121,7 +121,7 @@ namespace weixinDemo
 
         //private static Environment of(InputStream is, String location) {
         //    if (is == null) {
-        //        Console.WriteLine("InputStream not found: " + location);
+        //        WriteLog("InputStream not found: " + location);
         //        return null;
         //    }
         //    try {
