@@ -7,6 +7,27 @@ using System.Threading;
 
 namespace weixinDemo
 {
+    public enum EnumMsgType
+    {
+        MSGTYPE_TEXT = 1,
+        MSGTYPE_IMAGE = 3,
+        MSGTYPE_VOICE = 34,
+        MSGTYPE_VERIFYMSG = 37,
+        MSGTYPE_POSSIBLEFRIEND_MSG = 40,
+        MSGTYPE_SHARECARD = 42,
+        MSGTYPE_VIDEO = 43,
+        MSGTYPE_EMOTICON = 47,
+        MSGTYPE_LOCATION = 48,
+        MSGTYPE_APP = 49,
+        MSGTYPE_VOIPMSG = 50,
+        MSGTYPE_STATUSNOTIFY = 51,
+        MSGTYPE_VOIPNOTIFY = 52,
+        MSGTYPE_VOIPINVITE = 53,
+        MSGTYPE_MICROVIDEO = 62,
+        MSGTYPE_SYSNOTICE = 9999,
+        MSGTYPE_SYS = 10000,
+        MSGTYPE_RECALLED = 10002
+    }
     public class StartUI : WechatApi
     {
         //private static final ExecutorService executorService = Executors.newFixedThreadPool(3);
@@ -37,6 +58,7 @@ namespace weixinDemo
                 }
                 break;
             }
+            FormLogin.instance.SetTitle("请在手机上点击登录");
             while (true)
             {
                 WriteLog(Const.LOG_MSG_CONFIRM_LOGIN);
@@ -56,23 +78,29 @@ namespace weixinDemo
             WriteLog(Const.LOG_MSG_START);
 
             getUUID(); //获取uuid
-            
+
             genqrcode();//获取二维码
 
             waitForLogin();//等待用户扫描、确定
 
             login(); //登录
-            
+            FormLogin.instance.SetTitle("登录成功");
+
             webwxinit(); //初始化
+            FormLogin.instance.SetTitle("初始化成功");
 
             openStatusNotify(); //开启微信状态通知
+            FormLogin.instance.SetTitle("开启微信状态通知成功");
 
             getContact(); //获取联系人
+            FormLogin.instance.SetTitle("获取联系人成功");
+
+            //getGroup();
 
             //填充联系人列表
             FormLogin.instance.SetVisable(false);
             FormLogin.instance.ShowMain();
-            FormLogin.formMain.SetContact(this.contactList);
+            FormLogin.formMain.SetContact(this.contactList); //this.groupList
 
             snapshot(); //保存配置
 
@@ -102,6 +130,8 @@ namespace weixinDemo
                             break;
                         case 1101:
                             WriteLog(Const.LOG_MSG_LOGIN_OTHERWHERE);
+                            FormLogin.formMain.SetTitle(Const.LOG_MSG_LOGIN_OTHERWHERE);
+                            FormLogin.instance.SetVisable(true);
                             break;
                         case 1102:
                             WriteLog(Const.LOG_MSG_QUIT_ON_PHONE);
@@ -114,12 +144,12 @@ namespace weixinDemo
                             break;
                     }
                     WriteLog("listen synccheck ...end.");
-                    Thread.Sleep(3000);
                 }
                 catch (Exception ex)
                 {
-                    WriteLog("listen异常：{0}", ex.Message);
+                    WriteError("listen异常：{0} : {1}", ex.Message,ex.StackTrace);
                 }
+                Thread.Sleep(3000);
             }
         }
 
@@ -222,37 +252,50 @@ namespace weixinDemo
                 UserMessage userMessage = new UserMessage(this);
                 userMessage.setRawMsg(element);
 
-                // 文本groupMessage
-                if (conf["MSGTYPE_TEXT"]== msgType)
+                switch ((EnumMsgType)(int.Parse(msgType)))
                 {
-                    // 地理位置消息
-                    if (content.Contains("pictype=location"))
-                    {
-                        String location = content.Split(new string[] { "<br/>" },StringSplitOptions.None)[1];
-                        userMessage.setLocation(location);
-                        userMessage.setLog(String.Format(Const.LOG_MSG_LOCATION, location));
-                    }
-                    else
-                    {
-                        // 普通文本
-                        String text = null;
-                        if (content.Contains(":<br/>"))
+                    case EnumMsgType.MSGTYPE_TEXT:
+                        // 地理位置消息
+                        if (content.Contains("pictype=location"))
                         {
-                            text = content.Split(new string[] { ":<br/>" }, StringSplitOptions.None)[1];
+                            String location = content.Split(new string[] { "<br/>" }, StringSplitOptions.None)[1];
+                            userMessage.setLocation(location);
+                            userMessage.setLog(String.Format(Const.LOG_MSG_LOCATION, location));
                         }
                         else
                         {
-                            text = content;
+                            // 普通文本
+                            String text = null;
+                            if (content.Contains(":<br/>"))
+                            {
+                                text = content.Split(new string[] { ":<br/>" }, StringSplitOptions.None)[1];
+                            }
+                            else
+                            {
+                                text = content;
+                            }
+                            userMessage.setText(text);
+                            userMessage.setLog(text.Replace("<br/>", "\n"));
                         }
-                        userMessage.setText(text);
-                        userMessage.setLog(text.Replace("<br/>", "\n"));
-                    }
+                        break;
+                    case EnumMsgType.MSGTYPE_IMAGE:
+                        WriteLog(Const.LOG_MSG_PICTURE,"");
+                        break;
+                    case EnumMsgType.MSGTYPE_STATUSNOTIFY:
+                        WriteLog(Const.LOG_MSG_NOTIFY_PHONE);
+                        break;
+
                 }
-                else if (conf["MSGTYPE_STATUSNOTIFY"]==msgType)
-                {
-                    WriteLog(Const.LOG_MSG_NOTIFY_PHONE);
-                    return;
-                }
+                //// 文本groupMessage
+                //if (conf["MSGTYPE_TEXT"] == msgType)
+                //{
+
+                //}
+                //else if (conf["MSGTYPE_STATUSNOTIFY"] == msgType)
+                //{
+                //    WriteLog(Const.LOG_MSG_NOTIFY_PHONE);
+                //    return;
+                //}
 
                 this.show_msg(userMessage);
 
@@ -276,7 +319,7 @@ namespace weixinDemo
         }
         private void show_msg(UserMessage userMessage)
         {
-            Dictionary<String, String> src = new Dictionary<string, string>() { { "","" }};
+            Dictionary<String, String> src = new Dictionary<string, string>() { { "", "" } };
             Dictionary<String, String> dst = null;
             Dictionary<String, String> group = null;
             JObject msg = userMessage.getRawMsg();
@@ -287,7 +330,7 @@ namespace weixinDemo
             String msg_id = ((JValue)msg["MsgId"]).Value.ToString();
 
             // 接收到来自群的消息
-            if (((JValue)msg["FromUserName"]).Value.ToString().Substring(0,2)=="@@")
+            if (((JValue)msg["FromUserName"]).Value.ToString().Substring(0, 2) == "@@")
             {
                 String groupId = ((JValue)msg["FromUserName"]).Value.ToString();
                 group = this.getGroupById(groupId);
@@ -295,7 +338,7 @@ namespace weixinDemo
                 {
                     String u_id = content.Split(new string[] { ":<br/>" }, StringSplitOptions.None)[0];
                     src = this.getGroupUserById(u_id, groupId);
-                    dst = new Dictionary<string, string>() { { "ShowName", "GROUP" }};
+                    dst = new Dictionary<string, string>() { { "ShowName", "GROUP" } };
                 }
                 else
                 {
@@ -321,7 +364,7 @@ namespace weixinDemo
             {
                 string newMsg = string.Format(DateTime.Now.ToString(" hh:mm:ss ") + "{0} {1} -> {2}: {3}\n", msg_id, src["ShowName"],
                         dst["ShowName"], userMessage.getLog());
-                
+
                 WriteLog(newMsg);
             }
             //显示到界面上
@@ -423,7 +466,7 @@ namespace weixinDemo
                 group = this.getGroupById(g_id);
                 if (content.Contains(":<br/>"))
                 {
-                    String u_id = content.Split(new string[] { ":<br/>" },StringSplitOptions.None)[0];
+                    String u_id = content.Split(new string[] { ":<br/>" }, StringSplitOptions.None)[0];
                     src = getGroupUserById(u_id, g_id);
                 }
             }

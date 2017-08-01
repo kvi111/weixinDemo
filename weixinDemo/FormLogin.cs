@@ -74,6 +74,20 @@ namespace weixinDemo
             }
         }
 
+        public void SetTitle(string msg)
+        {
+            msg += "\n";
+            if (this.InvokeRequired)
+            {
+                Action<string> actionDelegate = delegate (string item) { this.Text = item; };
+                this.Invoke(actionDelegate, msg);
+            }
+            else
+            {
+                this.Text = msg;
+            }
+        }
+
         private void FormLogin_FormClosing(object sender, FormClosingEventArgs e)
         {
             FormClose();

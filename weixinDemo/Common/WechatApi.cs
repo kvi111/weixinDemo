@@ -47,7 +47,9 @@ namespace weixinDemo
 
         protected int memberCount;
 
-        // 好友
+        /// <summary>
+        /// 联系人列表
+        /// </summary>
         public JArray contactList;
 
         // 群
@@ -61,6 +63,11 @@ namespace weixinDemo
 
         // 特殊账号
         protected JArray specialUsersList;
+
+        /// <summary>
+        /// 最近会话列表
+        /// </summary>
+        protected JArray sessionList;
 
         // 读取、连接、发送超时时长，单位/秒
         private int readTimeout, connTimeout, writeTimeout;
@@ -318,17 +325,23 @@ namespace weixinDemo
             }
 
             String code = Utils.match(response, "window.code=(\\d+);");
+
+
             if (Utils.isBlank(code))
             {
                 WriteLog("扫描二维码验证失败");
                 return false;
             }
 
-            if (code == "201")
+            if (code == "201") //扫码后进入
             {
+                String base64HeadImg = Utils.match(response, "window.userAvatar = 'data:img/jpg;base64,(\\S+?)';"); //头像
+                byte[] headImg = Convert.FromBase64String(base64HeadImg);
+                FormLogin.instance.SetQRImage(headImg);
                 return true;
             }
-            if (code == "200")
+
+            if (code == "200") //点确定后进入
             {
                 String pm = Utils.match(response, "window.redirect_uri=\"(\\S+?)\";");
                 String r_uri = pm + "&fun=new";
@@ -465,7 +478,7 @@ namespace weixinDemo
             String bodyJson = "";
 
             HttpWebRequest webClient = (HttpWebRequest)HttpWebRequest.Create(url);
-            webClient.ContentType = "application/json";
+            //webClient.ContentType = "application/json";
             webClient.Method = "POST";
             if (null != cookie)
             {
@@ -482,7 +495,6 @@ namespace weixinDemo
                 requestStream.Close();
             }
 
-            //WriteLog("[*] 请求 => \n");
             try
             {
                 //Response response = client.newCall(request).execute();
@@ -493,19 +505,20 @@ namespace weixinDemo
                 }
                 if (null != body && body.Length <= 300)
                 {
-                    WriteLog("[*] 响应 => {0}", body);
+                    //WriteLog("[*] 响应 => {0}", body);
                 }
 
                 return JObject.Parse(body);  //JsonObject
             }
             catch (Exception e)
             {
-                WriteLog("doPost异常：{0}", e.StackTrace);
+                WriteError("doPost异常：{0}_{1}", e.Message, e.StackTrace);
                 return null; // JObject.Parse("{}");
             }
         }
+
         /// <summary>
-        /// 微信初始化
+        /// 微信初始化，获取当前用户信息，以及最近会话列表(包括群，联系人等，会和后面的获取联系人结果有重复)
         /// </summary>
         /// <returns></returns>
         public void webwxinit()
@@ -526,6 +539,7 @@ namespace weixinDemo
                     {
                         continue;
                     }
+                    this.sessionList = (JArray)responseJson["ContactList"];//最近会话列表
 
                     this.user = JsonToDictionary(responseJson["User"]);
                     this.makeSynckey(responseJson);
@@ -595,7 +609,7 @@ namespace weixinDemo
                 }
                 catch (Exception ex)
                 {
-                    WriteLog("webwxinit异常：{0}", ex.Message);
+                    WriteError("webwxinit异常：{0}", ex.Message);
                     continue;
                 }
             }
@@ -647,15 +661,20 @@ namespace weixinDemo
                     HashSet<String> specialUsers = Const.API_SPECIAL_USER;
 
                     JObject response = doPost(url, null);
+
                     if (null == response)
                     {
+                        WriteError("getContact  response为空！");
                         continue;
                     }
 
                     this.memberCount = int.Parse(((JValue)response["MemberCount"]).Value.ToString());
                     this.memberList = (JArray)response["MemberList"];
+                    memberList.Add(sessionList.ToArray());
 
-                    JArray ContactList = new JArray(memberList);
+                    JArray ContactList = new JArray(memberList.ToArray());
+                    //ContactList.Add(sessionList.ToArray());
+                    //ContactList.Add((JArray)sessionList);
 
                     this.publicUsersList = new JArray();
                     this.groupList = new JArray();
@@ -667,17 +686,17 @@ namespace weixinDemo
                         string elementUserName = ((JValue)contact["UserName"]).Value.ToString();
                         if (elementVerifyFlag != "0") //公众号/服务号
                         {
-                            ContactList.Remove(contact);
+                            //ContactList.Remove(contact);
                             this.publicUsersList.Add(contact);
                         }
                         else if (specialUsers.Contains(elementUserName)) //特殊账号
                         {
-                            ContactList.Remove(contact);
+                            //ContactList.Remove(contact);
                             this.specialUsersList.Add(contact);
                         }
                         else if (elementUserName.Contains("@@")) // 微信群
                         {
-                            ContactList.Remove(contact);
+                            //ContactList.Remove(contact);
                             this.groupList.Add(contact);
                         }
                         else if (elementUserName == this.user["UserName"].ToString()) //自己
@@ -693,12 +712,62 @@ namespace weixinDemo
                 }
                 catch (Exception ex)
                 {
-                    WriteLog("getContact异常：{0}", ex.Message);
+                    WriteError("getContact异常：{0}", ex.Message);
                     continue;
                 }
             }
         }
 
+        /// <summary>
+        /// 获取聊天会话列表
+        /// 第一次请求得到最近一段时间内活跃的群组（但不知道腾讯是怎么定义这段时间的）
+        /// 第二次请求得到剩下的（最近没有交流的）群组： 
+        /// </summary>
+        public void getGroup()
+        {
+            int i = 1;
+            while (i <= 2)
+            {
+                try
+                {
+                    WriteLog("获取聊天会话列表，第{0}次", i);
+                    String url = conf["API_webwxbatchgetcontact"] + "?type=ex&r={0}&pass_ticket={1}";
+                    url = String.Format(url, Utils.currentTimeMillis(), session.getPassTicket());
+
+                    JObject response = doPost(url, null);
+                    if (null == response)
+                    {
+                        WriteError("getGroup  response为空！");
+                        continue;
+                    }
+
+                    this.memberCount = int.Parse(((JValue)response["Count"]).Value.ToString());
+                    if (memberCount == 0)
+                    {
+                        continue;
+                    }
+                    //this.memberList = (JArray)response["MemberList"];
+
+                    //JArray ContactList = new JArray(memberList);
+
+                    //foreach (JObject contact in memberList)
+                    //{
+
+                    //}
+                    //this.contactList = ContactList;
+
+                    WriteLog(Const.LOG_MSG_CONTACT_COUNT, memberCount, memberList.Count);
+                    WriteLog(Const.LOG_MSG_OTHER_CONTACT_COUNT, groupList.Count, contactList.Count, specialUsersList.Count, publicUsersList.Count);
+                    i++;
+                }
+                catch (Exception ex)
+                {
+                    WriteError("getGroup异常：{0}", ex.Message);
+                    continue;
+                }
+                Thread.Sleep(3000);
+            }
+        }
         /// <summary>
         /// 保存配置
         /// </summary>
@@ -742,6 +811,30 @@ namespace weixinDemo
                 arr[1] = int.Parse(selector);
             }
             return arr;
+        }
+
+        /// <summary>
+        /// 获取联系人头像
+        ///     seq: 数字, 可为空
+        ///     username: ID
+        ///     skey: xxx
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        public JObject GetContactHeadImg(String userName)
+        {
+            String url = conf["API_webwxgeticon"] + "?seq=637275253&username={0}&skey={1}";  //seq=637275253&
+            url = String.Format(url, userName, session.getSkey());
+
+            String clientMsgId = Utils.currentTimeMillis() + Utils.getRandomNumber(5);
+
+            JObject response = doPost(url, null);
+            if (null == response)
+            {
+                return null;
+            }
+            return response;
         }
 
         public void sendText(String msg, String uid)
@@ -795,11 +888,11 @@ namespace weixinDemo
                 //JsonObject member = element.getAsJsonObject();
                 if (((JValue)element["UserName"]).Value.ToString() == groupId)
                 {
-                    group["NickName"] = Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
-                    group["DisplayName"] = Utils.emptyOr(((JValue)element["DisplayName"]).Value.ToString(), "");
-                    group["ShowName"] = Utils.emptyOr(((JValue)element["ShowName"]).Value.ToString(), "");
-                    group["OwnerUin"] = Utils.emptyOr(((JValue)element["OwnerUin"]).Value.ToString(), "");
-                    group["MemberCount"] = Utils.emptyOr(((JValue)element["MemberCount"]).Value.ToString(), "0");
+                    group["NickName"] = ((JValue)element["NickName"]) == null ? "" : ((JValue)element["NickName"]).Value.ToString();// Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
+                    group["DisplayName"] = ((JValue)element["DisplayName"]) == null ? "" : ((JValue)element["DisplayName"]).Value.ToString(); //Utils.emptyOr(((JValue)element["DisplayName"]).Value.ToString(), "");
+                    group["ShowName"] = ((JValue)element["ShowName"]) == null ? "" : ((JValue)element["ShowName"]).Value.ToString();//Utils.emptyOr(((JValue)element["ShowName"]).Value.ToString(), "");
+                    group["OwnerUin"] = ((JValue)element["OwnerUin"]) == null ? "" : ((JValue)element["OwnerUin"]).Value.ToString(); //Utils.emptyOr(((JValue)element["OwnerUin"]).Value.ToString(), "");
+                    group["MemberCount"] = ((JValue)element["MemberCount"]) == null ? "0" : ((JValue)element["MemberCount"]).Value.ToString();//Utils.emptyOr(((JValue)element["MemberCount"]).Value.ToString(), "0");
                     break;
                 }
             }
@@ -840,12 +933,12 @@ namespace weixinDemo
                 //JsonObject member = element.getAsJsonObject();
                 if (((JValue)element["UserName"]).Value.ToString() == userId)
                 {
-                    String nickName = Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
-                    String displayName = Utils.emptyOr(((JValue)element["DisplayName"]).Value.ToString(), "");
+                    String nickName = ((JValue)element["NickName"]) == null ? "" : ((JValue)element["NickName"]).Value.ToString(); //Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
+                    String displayName = ((JValue)element["DisplayName"]) == null ? "" : ((JValue)element["DisplayName"]).Value.ToString(); //Utils.emptyOr(((JValue)element["DisplayName"]).Value.ToString(), "");
                     user["NickName"] = nickName;
                     user["DisplayName"] = displayName;
-                    user["AttrStatus"] = Utils.emptyOr(((JValue)element["AttrStatus"]).Value.ToString(), "");
-                    user["ShowName"] = Utils.emptyOr(displayName, nickName);
+                    user["AttrStatus"] = ((JValue)element["AttrStatus"]) == null ? "" : ((JValue)element["AttrStatus"]).Value.ToString(); //Utils.emptyOr(((JValue)element["AttrStatus"]).Value.ToString(), "");
+                    user["ShowName"] = displayName ?? nickName;
                     break;
                 }
             }
@@ -880,8 +973,8 @@ namespace weixinDemo
                     //JsonObject item = element.getAsJsonObject();
                     if (((JValue)element["UserName"]).Value.ToString() == userId)
                     {
-                        user["RemarkName"] = Utils.emptyOr(((JValue)element["RemarkName"]).Value.ToString(), "");
-                        user["NickName"] = Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
+                        user["RemarkName"] = ((JValue)element["RemarkName"]) == null ? "" : ((JValue)element["RemarkName"]).Value.ToString();// Utils.emptyOr(((JValue)element["RemarkName"]).Value.ToString(), "");
+                        user["NickName"] = ((JValue)element["NickName"]) == null ? "" : ((JValue)element["NickName"]).Value.ToString();//Utils.emptyOr(((JValue)element["NickName"]).Value.ToString(), "");
                         if (string.IsNullOrEmpty(user["RemarkName"]) == false)
                         {
                             user["ShowName"] = user["RemarkName"];
@@ -920,6 +1013,13 @@ namespace weixinDemo
 
         public void WriteLog(string formatString, params object[] parms)
         {
+            Console.ForegroundColor = ConsoleColor.White;
+            string msg = String.Format(formatString, parms);
+            Console.WriteLine(DateTime.Now.ToString(" hh:mm:ss ") + msg);
+        }
+        public void WriteError(string formatString, params object[] parms)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
             string msg = String.Format(formatString, parms);
             Console.WriteLine(DateTime.Now.ToString(" hh:mm:ss ") + msg);
         }

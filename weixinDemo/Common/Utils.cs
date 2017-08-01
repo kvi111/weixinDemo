@@ -32,7 +32,7 @@ namespace weixinDemo
 
         public static String emptyOr(String str1, String str2)
         {
-            if (isBlank(str1))
+            if (string.IsNullOrEmpty(str1))
             {
                 return str2;
             }

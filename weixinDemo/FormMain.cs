@@ -21,6 +21,7 @@ namespace weixinDemo
             listBoxContact.Font = new Font("微软雅黑", 12);
             listBoxContact.DisplayMember = "text";
             listBoxContact.ValueMember = "value";
+            listBoxContact.ScrollAlwaysVisible = false;
         }
 
         public void SetContact(JArray contactList)
@@ -31,6 +32,7 @@ namespace weixinDemo
                 ListItem listItem = new ListItem() { text = ((JValue)contact["NickName"]).Value.ToString(), value = ((JValue)contact["UserName"]).Value.ToString() };
                 //listBox1.Items.Add(listItem);
                 AddListItem(listItem);
+                //FormLogin.instance.startUI.GetContactHeadImg(listItem.value);
             }
         }
 
